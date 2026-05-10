@@ -28,22 +28,25 @@
   .layout { display: grid; grid-template-columns: 1fr 280px; gap: 1.4rem; align-items: start; }
   .map-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; }
   #map-svg { width: 100%; height: auto; display: block; }
-
   .state-path { stroke: #fff; stroke-width: 0.7; cursor: pointer; transition: opacity 0.12s; }
   .state-path.dem { fill: var(--dem); }
   .state-path.rep { fill: var(--rep); }
   .state-path:hover { opacity: 0.72; }
   .state-path.active { stroke: #f59e0b; stroke-width: 2.5; opacity: 1 !important; }
 
-  /* Tooltip */
+  /* ── Tooltip ── */
   #tooltip {
     position: fixed; pointer-events: none; z-index: 9999;
     background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--radius); box-shadow: 0 8px 28px rgba(0,0,0,0.18);
     overflow: hidden; width: 230px; display: none;
   }
-  .tt-img { width: 100%; height: 170px; object-fit: cover; object-position: center top; display: block; background: #ddd; }
-  .tt-img-ph { width: 100%; height: 170px; display: flex; align-items: center; justify-content: center; font-size: 3.5rem; background: #e8e8e8; color: #bbb; }
+  .photo-box { width: 100%; height: 175px; background: #e0ddd6; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+  .photo-box img { width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
+  .photo-box .ph { font-size: 3.5rem; color: #bbb; }
+  .photo-box .spinner { width: 28px; height: 28px; border: 3px solid #ddd; border-top-color: #999; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   .tt-bar { padding: 8px 12px 7px; }
   .tt-bar.dem { background: var(--dem); } .tt-bar.rep { background: var(--rep); }
   .tt-state { font-family: 'Libre Baskerville', serif; font-size: 13px; font-weight: 700; color: #fff; }
@@ -56,7 +59,7 @@
   .tt-badge.dem { background: var(--dem-light); color: var(--dem-text); }
   .tt-badge.rep { background: var(--rep-light); color: var(--rep-text); }
 
-  /* Sidebar */
+  /* ── Sidebar ── */
   .sidebar { display: flex; flex-direction: column; gap: 12px; }
   .select-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
   .sel-label { display: block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 6px; }
@@ -64,8 +67,10 @@
   select:focus { border-color: var(--dem); }
 
   .gov-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: none; }
-  .gc-img { width: 100%; height: 220px; object-fit: cover; object-position: center top; display: block; background: #ddd; }
-  .gc-img-ph { width: 100%; height: 220px; display: flex; align-items: center; justify-content: center; font-size: 4rem; background: #eee; color: #bbb; }
+  .gc-photo-box { width: 100%; height: 230px; background: #e0ddd6; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .gc-photo-box img { width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
+  .gc-photo-box .ph { font-size: 4rem; color: #bbb; }
+  .gc-photo-box .spinner { width: 32px; height: 32px; border: 3px solid #ddd; border-top-color: #999; border-radius: 50%; animation: spin 0.7s linear infinite; }
   .gc-bar { padding: 10px 14px 8px; }
   .gc-bar.dem { background: var(--dem); } .gc-bar.rep { background: var(--rep); }
   .gc-state { font-family: 'Libre Baskerville', serif; font-size: 15px; font-weight: 700; color: #fff; }
@@ -112,7 +117,7 @@
         <select id="state-sel"><option value="">— Choose a state —</option></select>
       </div>
       <div class="gov-card" id="gov-card">
-        <div id="gc-photo-area"></div>
+        <div class="gc-photo-box" id="gc-photo-box"><div class="ph">👤</div></div>
         <div class="gc-bar" id="gc-bar">
           <div class="gc-state" id="gc-state"></div>
           <div class="gc-plbl" id="gc-plbl"></div>
@@ -134,7 +139,7 @@
 </div>
 
 <div id="tooltip">
-  <div id="tt-photo-area"></div>
+  <div class="photo-box" id="tt-photo-box"><div class="ph">👤</div></div>
   <div class="tt-bar" id="tt-bar">
     <div class="tt-state" id="tt-state"></div>
     <div class="tt-plbl" id="tt-plbl"></div>
@@ -149,119 +154,66 @@
 
 <footer>
   Data: <a href="https://www.nga.org/governors/" target="_blank">National Governors Association</a> &middot;
-  Photos: <a href="https://en.wikipedia.org" target="_blank">Wikipedia / Wikimedia Commons</a> &middot;
+  Photos: <a href="https://en.wikipedia.org" target="_blank">Wikipedia</a> &middot;
   Updated May 2026
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
 <script>
-// All photo URLs are direct Wikimedia Commons links (public domain / CC licensed official portraits)
-// Three previously broken ones fixed with correct filenames:
-//   Washington -> Bob_Ferguson_03_crop.jpg (verified via Wikidata)
-//   Kansas     -> Laura_Kelly_official_portrait.jpg
-//   Delaware   -> Matt_Meyer_official_photo.jpg
+// Wikipedia article titles for each governor.
+// Photos are fetched at runtime via the Wikipedia REST API with origin=* (CORS-safe, works on GitHub Pages).
 const GOV = {
-  "Alabama":        {name:"Kay Ivey",                party:"rep",since:"2017",end:"2027",note:"Term limited",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/9/96/Kay_Ivey_official_photo_%28cropped%29.jpg/480px-Kay_Ivey_official_photo_%28cropped%29.jpg"},
-  "Alaska":         {name:"Mike Dunleavy",            party:"rep",since:"2018",end:"2026",note:"Term limited",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/Mike_Dunleavy_official_photo_%28cropped%29.jpg/480px-Mike_Dunleavy_official_photo_%28cropped%29.jpg"},
-  "Arizona":        {name:"Katie Hobbs",              party:"dem",since:"2023",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Katie_Hobbs_official_photo.jpg/480px-Katie_Hobbs_official_photo.jpg"},
-  "Arkansas":       {name:"Sarah Huckabee Sanders",   party:"rep",since:"2023",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Sarah_Huckabee_Sanders_official_photo_%28cropped%29.jpg/480px-Sarah_Huckabee_Sanders_official_photo_%28cropped%29.jpg"},
-  "California":     {name:"Gavin Newsom",             party:"dem",since:"2019",end:"2027",note:"Term limited",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Gavin_Newsom_official_photo.jpg/480px-Gavin_Newsom_official_photo.jpg"},
-  "Colorado":       {name:"Jared Polis",              party:"dem",since:"2019",end:"2027",note:"Term limited",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/Jared_Polis_official_photo_%28cropped%29.jpg/480px-Jared_Polis_official_photo_%28cropped%29.jpg"},
-  "Connecticut":    {name:"Ned Lamont",               party:"dem",since:"2019",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Ned_Lamont_official_photo.jpg/480px-Ned_Lamont_official_photo.jpg"},
-  "Delaware":       {name:"Matt Meyer",               party:"dem",since:"2025",end:"2029",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/Matt_Meyer_headshot.jpg/480px-Matt_Meyer_headshot.jpg"},
-  "Florida":        {name:"Ron DeSantis",             party:"rep",since:"2019",end:"2027",note:"Term limited",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Ron_DeSantis_official_photo_%28cropped%29.jpg/480px-Ron_DeSantis_official_photo_%28cropped%29.jpg"},
-  "Georgia":        {name:"Brian Kemp",               party:"rep",since:"2019",end:"2027",note:"Term limited",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/0/05/Brian_Kemp_official_photo_%28cropped%29.jpg/480px-Brian_Kemp_official_photo_%28cropped%29.jpg"},
-  "Hawaii":         {name:"Josh Green",               party:"dem",since:"2023",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Josh_Green_official_photo_%28cropped%29.jpg/480px-Josh_Green_official_photo_%28cropped%29.jpg"},
-  "Idaho":          {name:"Brad Little",              party:"rep",since:"2019",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Brad_Little_official_photo_%28cropped%29.jpg/480px-Brad_Little_official_photo_%28cropped%29.jpg"},
-  "Illinois":       {name:"JB Pritzker",              party:"dem",since:"2019",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/JB_Pritzker_official_photo_%28cropped%29.jpg/480px-JB_Pritzker_official_photo_%28cropped%29.jpg"},
-  "Indiana":        {name:"Mike Braun",               party:"rep",since:"2025",end:"2029",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/Mike_Braun_official_photo_%28cropped%29.jpg/480px-Mike_Braun_official_photo_%28cropped%29.jpg"},
-  "Iowa":           {name:"Kim Reynolds",             party:"rep",since:"2017",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/6/68/Kim_Reynolds_official_photo_%28cropped%29.jpg/480px-Kim_Reynolds_official_photo_%28cropped%29.jpg"},
-  "Kansas":         {name:"Laura Kelly",              party:"dem",since:"2019",end:"2027",note:"Term limited",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Laura_Kelly_official_portrait.jpg/480px-Laura_Kelly_official_portrait.jpg"},
-  "Kentucky":       {name:"Andy Beshear",             party:"dem",since:"2019",end:"2027",note:"Term limited",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/8/81/Andy_Beshear_official_photo_%28cropped%29.jpg/480px-Andy_Beshear_official_photo_%28cropped%29.jpg"},
-  "Louisiana":      {name:"Jeff Landry",              party:"rep",since:"2024",end:"2028",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Jeff_Landry_official_photo_%28cropped%29.jpg/480px-Jeff_Landry_official_photo_%28cropped%29.jpg"},
-  "Maine":          {name:"Janet Mills",              party:"dem",since:"2019",end:"2027",note:"Term limited",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Janet_Mills_official_photo_%28cropped%29.jpg/480px-Janet_Mills_official_photo_%28cropped%29.jpg"},
-  "Maryland":       {name:"Wes Moore",                party:"dem",since:"2023",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/5/56/Wes_Moore_official_photo_%28cropped%29.jpg/480px-Wes_Moore_official_photo_%28cropped%29.jpg"},
-  "Massachusetts":  {name:"Maura Healey",             party:"dem",since:"2023",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/Maura_Healey_official_photo_%28cropped%29.jpg/480px-Maura_Healey_official_photo_%28cropped%29.jpg"},
-  "Michigan":       {name:"Gretchen Whitmer",         party:"dem",since:"2019",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/0/07/Gretchen_Whitmer_official_photo_%28cropped%29.jpg/480px-Gretchen_Whitmer_official_photo_%28cropped%29.jpg"},
-  "Minnesota":      {name:"Tim Walz",                 party:"dem",since:"2019",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/a/a6/Tim_Walz_official_photo_%28cropped%29.jpg/480px-Tim_Walz_official_photo_%28cropped%29.jpg"},
-  "Mississippi":    {name:"Tate Reeves",              party:"rep",since:"2020",end:"2028",note:"Term limited",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/Tate_Reeves_official_photo_%28cropped%29.jpg/480px-Tate_Reeves_official_photo_%28cropped%29.jpg"},
-  "Missouri":       {name:"Mike Kehoe",               party:"rep",since:"2025",end:"2029",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Mike_Kehoe_official_photo.jpg/480px-Mike_Kehoe_official_photo.jpg"},
-  "Montana":        {name:"Greg Gianforte",           party:"rep",since:"2021",end:"2025",note:"Term limited",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Greg_Gianforte_official_photo_%28cropped%29.jpg/480px-Greg_Gianforte_official_photo_%28cropped%29.jpg"},
-  "Nebraska":       {name:"Jim Pillen",               party:"rep",since:"2023",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Jim_Pillen_official_photo_%28cropped%29.jpg/480px-Jim_Pillen_official_photo_%28cropped%29.jpg"},
-  "Nevada":         {name:"Joe Lombardo",             party:"rep",since:"2023",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/Joe_Lombardo_official_photo_%28cropped%29.jpg/480px-Joe_Lombardo_official_photo_%28cropped%29.jpg"},
-  "New Hampshire":  {name:"Kelly Ayotte",             party:"rep",since:"2025",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/Kelly_Ayotte_official_photo_%28cropped%29.jpg/480px-Kelly_Ayotte_official_photo_%28cropped%29.jpg"},
-  "New Jersey":     {name:"Mikie Sherrill",           party:"dem",since:"2026",end:"2030",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Mikie_Sherrill_official_photo_%28cropped%29.jpg/480px-Mikie_Sherrill_official_photo_%28cropped%29.jpg"},
-  "New Mexico":     {name:"Michelle Lujan Grisham",   party:"dem",since:"2019",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Michelle_Lujan_Grisham_official_photo_%28cropped%29.jpg/480px-Michelle_Lujan_Grisham_official_photo_%28cropped%29.jpg"},
-  "New York":       {name:"Kathy Hochul",             party:"dem",since:"2021",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Kathy_Hochul_official_photo_%28cropped%29.jpg/480px-Kathy_Hochul_official_photo_%28cropped%29.jpg"},
-  "North Carolina": {name:"Josh Stein",               party:"dem",since:"2025",end:"2029",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/e/e0/Josh_Stein_official_photo_%28cropped%29.jpg/480px-Josh_Stein_official_photo_%28cropped%29.jpg"},
-  "North Dakota":   {name:"Kelly Armstrong",          party:"rep",since:"2025",end:"2029",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Kelly_Armstrong_official_photo_%28cropped%29.jpg/480px-Kelly_Armstrong_official_photo_%28cropped%29.jpg"},
-  "Ohio":           {name:"Mike DeWine",              party:"rep",since:"2019",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Mike_DeWine_official_photo_%28cropped%29.jpg/480px-Mike_DeWine_official_photo_%28cropped%29.jpg"},
-  "Oklahoma":       {name:"Kevin Stitt",              party:"rep",since:"2019",end:"2027",note:"Term limited",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Kevin_Stitt_official_photo_%28cropped%29.jpg/480px-Kevin_Stitt_official_photo_%28cropped%29.jpg"},
-  "Oregon":         {name:"Tina Kotek",               party:"dem",since:"2023",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Tina_Kotek_official_photo_%28cropped%29.jpg/480px-Tina_Kotek_official_photo_%28cropped%29.jpg"},
-  "Pennsylvania":   {name:"Josh Shapiro",             party:"dem",since:"2023",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/7/73/Josh_Shapiro_official_photo_%28cropped%29.jpg/480px-Josh_Shapiro_official_photo_%28cropped%29.jpg"},
-  "Rhode Island":   {name:"Dan McKee",                party:"dem",since:"2021",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/9/9b/Dan_McKee_official_photo_%28cropped%29.jpg/480px-Dan_McKee_official_photo_%28cropped%29.jpg"},
-  "South Carolina": {name:"Henry McMaster",           party:"rep",since:"2017",end:"2027",note:"Term limited",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/7/7c/Henry_McMaster_official_photo_%28cropped%29.jpg/480px-Henry_McMaster_official_photo_%28cropped%29.jpg"},
-  "South Dakota":   {name:"Larry Rhoden",             party:"rep",since:"2025",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/4/4e/Larry_Rhoden_official_photo.jpg/480px-Larry_Rhoden_official_photo.jpg"},
-  "Tennessee":      {name:"Bill Lee",                 party:"rep",since:"2019",end:"2027",note:"Term limited",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/6/68/Bill_Lee_official_photo_%28cropped%29.jpg/480px-Bill_Lee_official_photo_%28cropped%29.jpg"},
-  "Texas":          {name:"Greg Abbott",              party:"rep",since:"2015",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/9/9e/Greg_Abbott_official_photo_%28cropped%29.jpg/480px-Greg_Abbott_official_photo_%28cropped%29.jpg"},
-  "Utah":           {name:"Spencer Cox",              party:"rep",since:"2021",end:"2025",note:"Term limited",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Spencer_Cox_official_photo_%28cropped%29.jpg/480px-Spencer_Cox_official_photo_%28cropped%29.jpg"},
-  "Vermont":        {name:"Phil Scott",               party:"rep",since:"2017",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/5/55/Phil_Scott_official_photo_%28cropped%29.jpg/480px-Phil_Scott_official_photo_%28cropped%29.jpg"},
-  "Virginia":       {name:"Abigail Spanberger",       party:"dem",since:"2026",end:"2030",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/3/39/Abigail_Spanberger_official_photo_%28cropped%29.jpg/480px-Abigail_Spanberger_official_photo_%28cropped%29.jpg"},
-  "Washington":     {name:"Bob Ferguson",             party:"dem",since:"2025",end:"2029",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/8/83/Bob_Ferguson_03_crop.jpg/480px-Bob_Ferguson_03_crop.jpg"},
-  "West Virginia":  {name:"Patrick Morrisey",         party:"rep",since:"2025",end:"2029",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/5/5e/Patrick_Morrisey_official_photo_%28cropped%29.jpg/480px-Patrick_Morrisey_official_photo_%28cropped%29.jpg"},
-  "Wisconsin":      {name:"Tony Evers",               party:"dem",since:"2019",end:"2027",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/Tony_Evers_official_photo_%28cropped%29.jpg/480px-Tony_Evers_official_photo_%28cropped%29.jpg"},
-  "Wyoming":        {name:"Mark Gordon",              party:"rep",since:"2019",end:"2027",note:"Term limited",
-                     img:"https://upload.wikimedia.org/wikipedia/commons/thumb/6/67/Mark_Gordon_official_photo_%28cropped%29.jpg/480px-Mark_Gordon_official_photo_%28cropped%29.jpg"}
+  "Alabama":        {name:"Kay Ivey",                party:"rep",since:"2017",end:"2027",note:"Term limited", wiki:"Kay_Ivey"},
+  "Alaska":         {name:"Mike Dunleavy",            party:"rep",since:"2018",end:"2026",note:"Term limited", wiki:"Mike_Dunleavy"},
+  "Arizona":        {name:"Katie Hobbs",              party:"dem",since:"2023",end:"2027",                    wiki:"Katie_Hobbs"},
+  "Arkansas":       {name:"Sarah Huckabee Sanders",   party:"rep",since:"2023",end:"2027",                    wiki:"Sarah_Huckabee_Sanders"},
+  "California":     {name:"Gavin Newsom",             party:"dem",since:"2019",end:"2027",note:"Term limited", wiki:"Gavin_Newsom"},
+  "Colorado":       {name:"Jared Polis",              party:"dem",since:"2019",end:"2027",note:"Term limited", wiki:"Jared_Polis"},
+  "Connecticut":    {name:"Ned Lamont",               party:"dem",since:"2019",end:"2027",                    wiki:"Ned_Lamont"},
+  "Delaware":       {name:"Matt Meyer",               party:"dem",since:"2025",end:"2029",                    wiki:"Matt_Meyer_(Delaware_politician)"},
+  "Florida":        {name:"Ron DeSantis",             party:"rep",since:"2019",end:"2027",note:"Term limited", wiki:"Ron_DeSantis"},
+  "Georgia":        {name:"Brian Kemp",               party:"rep",since:"2019",end:"2027",note:"Term limited", wiki:"Brian_Kemp"},
+  "Hawaii":         {name:"Josh Green",               party:"dem",since:"2023",end:"2027",                    wiki:"Josh_Green_(politician)"},
+  "Idaho":          {name:"Brad Little",              party:"rep",since:"2019",end:"2027",                    wiki:"Brad_Little"},
+  "Illinois":       {name:"JB Pritzker",              party:"dem",since:"2019",end:"2027",                    wiki:"J._B._Pritzker"},
+  "Indiana":        {name:"Mike Braun",               party:"rep",since:"2025",end:"2029",                    wiki:"Mike_Braun"},
+  "Iowa":           {name:"Kim Reynolds",             party:"rep",since:"2017",end:"2027",                    wiki:"Kim_Reynolds"},
+  "Kansas":         {name:"Laura Kelly",              party:"dem",since:"2019",end:"2027",note:"Term limited", wiki:"Laura_Kelly_(politician)"},
+  "Kentucky":       {name:"Andy Beshear",             party:"dem",since:"2019",end:"2027",note:"Term limited", wiki:"Andy_Beshear"},
+  "Louisiana":      {name:"Jeff Landry",              party:"rep",since:"2024",end:"2028",                    wiki:"Jeff_Landry"},
+  "Maine":          {name:"Janet Mills",              party:"dem",since:"2019",end:"2027",note:"Term limited", wiki:"Janet_Mills"},
+  "Maryland":       {name:"Wes Moore",                party:"dem",since:"2023",end:"2027",                    wiki:"Wes_Moore"},
+  "Massachusetts":  {name:"Maura Healey",             party:"dem",since:"2023",end:"2027",                    wiki:"Maura_Healey"},
+  "Michigan":       {name:"Gretchen Whitmer",         party:"dem",since:"2019",end:"2027",                    wiki:"Gretchen_Whitmer"},
+  "Minnesota":      {name:"Tim Walz",                 party:"dem",since:"2019",end:"2027",                    wiki:"Tim_Walz"},
+  "Mississippi":    {name:"Tate Reeves",              party:"rep",since:"2020",end:"2028",note:"Term limited", wiki:"Tate_Reeves"},
+  "Missouri":       {name:"Mike Kehoe",               party:"rep",since:"2025",end:"2029",                    wiki:"Mike_Kehoe"},
+  "Montana":        {name:"Greg Gianforte",           party:"rep",since:"2021",end:"2025",note:"Term limited", wiki:"Greg_Gianforte"},
+  "Nebraska":       {name:"Jim Pillen",               party:"rep",since:"2023",end:"2027",                    wiki:"Jim_Pillen"},
+  "Nevada":         {name:"Joe Lombardo",             party:"rep",since:"2023",end:"2027",                    wiki:"Joe_Lombardo"},
+  "New Hampshire":  {name:"Kelly Ayotte",             party:"rep",since:"2025",end:"2027",                    wiki:"Kelly_Ayotte"},
+  "New Jersey":     {name:"Mikie Sherrill",           party:"dem",since:"2026",end:"2030",                    wiki:"Mikie_Sherrill"},
+  "New Mexico":     {name:"Michelle Lujan Grisham",   party:"dem",since:"2019",end:"2027",                    wiki:"Michelle_Lujan_Grisham"},
+  "New York":       {name:"Kathy Hochul",             party:"dem",since:"2021",end:"2027",                    wiki:"Kathy_Hochul"},
+  "North Carolina": {name:"Josh Stein",               party:"dem",since:"2025",end:"2029",                    wiki:"Josh_Stein"},
+  "North Dakota":   {name:"Kelly Armstrong",          party:"rep",since:"2025",end:"2029",                    wiki:"Kelly_Armstrong_(politician)"},
+  "Ohio":           {name:"Mike DeWine",              party:"rep",since:"2019",end:"2027",                    wiki:"Mike_DeWine"},
+  "Oklahoma":       {name:"Kevin Stitt",              party:"rep",since:"2019",end:"2027",note:"Term limited", wiki:"Kevin_Stitt"},
+  "Oregon":         {name:"Tina Kotek",               party:"dem",since:"2023",end:"2027",                    wiki:"Tina_Kotek"},
+  "Pennsylvania":   {name:"Josh Shapiro",             party:"dem",since:"2023",end:"2027",                    wiki:"Josh_Shapiro"},
+  "Rhode Island":   {name:"Dan McKee",                party:"dem",since:"2021",end:"2027",                    wiki:"Dan_McKee"},
+  "South Carolina": {name:"Henry McMaster",           party:"rep",since:"2017",end:"2027",note:"Term limited", wiki:"Henry_McMaster"},
+  "South Dakota":   {name:"Larry Rhoden",             party:"rep",since:"2025",end:"2027",                    wiki:"Larry_Rhoden"},
+  "Tennessee":      {name:"Bill Lee",                 party:"rep",since:"2019",end:"2027",note:"Term limited", wiki:"Bill_Lee_(Tennessee_politician)"},
+  "Texas":          {name:"Greg Abbott",              party:"rep",since:"2015",end:"2027",                    wiki:"Greg_Abbott"},
+  "Utah":           {name:"Spencer Cox",              party:"rep",since:"2021",end:"2025",note:"Term limited", wiki:"Spencer_Cox_(politician)"},
+  "Vermont":        {name:"Phil Scott",               party:"rep",since:"2017",end:"2027",                    wiki:"Phil_Scott_(politician)"},
+  "Virginia":       {name:"Abigail Spanberger",       party:"dem",since:"2026",end:"2030",                    wiki:"Abigail_Spanberger"},
+  "Washington":     {name:"Bob Ferguson",             party:"dem",since:"2025",end:"2029",                    wiki:"Bob_Ferguson_(politician)"},
+  "West Virginia":  {name:"Patrick Morrisey",         party:"rep",since:"2025",end:"2029",                    wiki:"Patrick_Morrisey"},
+  "Wisconsin":      {name:"Tony Evers",               party:"dem",since:"2019",end:"2027",                    wiki:"Tony_Evers"},
+  "Wyoming":        {name:"Mark Gordon",              party:"rep",since:"2019",end:"2027",note:"Term limited", wiki:"Mark_Gordon_(politician)"}
 };
 
 const FIPS = {
@@ -278,7 +230,50 @@ const FIPS = {
   "54":"West Virginia","55":"Wisconsin","56":"Wyoming"
 };
 
-/* populate dropdown */
+// Photo cache: wiki title -> URL string or null
+const photoCache = {};
+
+// Fetch photo via Wikipedia REST API with origin=* (CORS-safe for GitHub Pages and all origins)
+function getPhoto(wikiTitle) {
+  if (photoCache[wikiTitle] !== undefined) return Promise.resolve(photoCache[wikiTitle]);
+  const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiTitle)}`;
+  return fetch(url, { headers: { 'Api-User-Agent': 'USGovernorsMap/1.0' } })
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {
+      // Get the largest available thumbnail: prefer original if present, else thumbnail
+      let src = null;
+      if (data) {
+        if (data.originalimage && data.originalimage.source) src = data.originalimage.source;
+        else if (data.thumbnail && data.thumbnail.source) src = data.thumbnail.source;
+      }
+      photoCache[wikiTitle] = src;
+      return src;
+    })
+    .catch(() => { photoCache[wikiTitle] = null; return null; });
+}
+
+// Pre-fetch all photos in the background so they're ready when needed
+function preFetchAll() {
+  Object.values(GOV).forEach(g => getPhoto(g.wiki));
+}
+
+function setPhotoBox(boxEl, src) {
+  boxEl.innerHTML = '';
+  if (src) {
+    const img = document.createElement('img');
+    img.src = src;
+    img.onerror = () => { boxEl.innerHTML = '<div class="ph">👤</div>'; };
+    boxEl.appendChild(img);
+  } else {
+    boxEl.innerHTML = '<div class="ph">👤</div>';
+  }
+}
+
+function showSpinner(boxEl) {
+  boxEl.innerHTML = '<div class="spinner"></div>';
+}
+
+// Populate dropdown
 const sel = document.getElementById('state-sel');
 Object.keys(GOV).sort().forEach(s => {
   const o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o);
@@ -287,25 +282,19 @@ Object.keys(GOV).sort().forEach(s => {
 const tt = document.getElementById('tooltip');
 let pinnedState = null;
 
-function makeImg(src, cssClass, fallbackClass) {
-  const img = document.createElement('img');
-  img.className = cssClass;
-  img.onerror = function() {
-    const ph = document.createElement('div');
-    ph.className = fallbackClass;
-    ph.textContent = '👤';
-    this.replaceWith(ph);
-  };
-  img.src = src;
-  return img;
-}
-
 function fillTooltip(state) {
   const g = GOV[state]; if (!g) return;
   const p = g.party;
-  const pa = document.getElementById('tt-photo-area');
-  pa.innerHTML = '';
-  pa.appendChild(makeImg(g.img, 'tt-img', 'tt-img-ph'));
+  const pb = document.getElementById('tt-photo-box');
+
+  // Show cached photo immediately, or spinner while loading
+  if (photoCache[g.wiki] !== undefined) {
+    setPhotoBox(pb, photoCache[g.wiki]);
+  } else {
+    showSpinner(pb);
+    getPhoto(g.wiki).then(src => setPhotoBox(pb, src));
+  }
+
   document.getElementById('tt-bar').className = 'tt-bar ' + p;
   document.getElementById('tt-state').textContent = state;
   document.getElementById('tt-plbl').textContent = (p==='dem'?'Democratic':'Republican') + ' Governor';
@@ -336,9 +325,15 @@ function hideTooltip() { tt.style.display = 'none'; }
 function fillCard(state) {
   const g = GOV[state]; if (!g) return;
   const p = g.party;
-  const pa = document.getElementById('gc-photo-area');
-  pa.innerHTML = '';
-  pa.appendChild(makeImg(g.img, 'gc-img', 'gc-img-ph'));
+  const pb = document.getElementById('gc-photo-box');
+
+  if (photoCache[g.wiki] !== undefined) {
+    setPhotoBox(pb, photoCache[g.wiki]);
+  } else {
+    showSpinner(pb);
+    getPhoto(g.wiki).then(src => setPhotoBox(pb, src));
+  }
+
   document.getElementById('gc-bar').className = 'gc-bar ' + p;
   document.getElementById('gc-state').textContent = state;
   document.getElementById('gc-plbl').textContent = (p==='dem'?'Democratic':'Republican') + ' Governor';
@@ -363,6 +358,7 @@ document.addEventListener('mousemove', e => {
   if (tt.style.display === 'block') positionTooltip(e.clientX, e.clientY);
 });
 
+// D3 Map
 fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json')
   .then(r => r.json())
   .then(us => {
@@ -402,6 +398,9 @@ fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json')
       .datum(topojson.mesh(us, us.objects.states, (a,b) => a !== b))
       .attr('fill','none').attr('stroke','#fff').attr('stroke-width','0.6')
       .attr('d', pathGen);
+
+    // Pre-fetch all photos in background after map loads
+    preFetchAll();
   });
 </script>
 </body>
