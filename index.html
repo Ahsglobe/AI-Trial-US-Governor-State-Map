@@ -118,6 +118,57 @@
   footer { text-align: center; padding: 1.5rem; font-size: 0.78rem; color: var(--muted); border-top: 1px solid var(--border); margin-top: 2rem; }
   footer a { color: var(--dem); text-decoration: none; }
 
+  /* ── Mode toggle button ── */
+  .mode-toggle {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 20px;
+    padding: 5px 13px 5px 10px;
+    cursor: pointer;
+    color: #fff;
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .mode-toggle:hover { background: rgba(255,255,255,0.2); }
+  .mode-toggle-icon { font-size: 1rem; }
+
+  /* ── iOS mode overrides (applied via body.ios-mode) ── */
+  body.ios-mode .layout {
+    display: block;
+  }
+  body.ios-mode .sidebar {
+    grid-column: unset;
+    grid-row: unset;
+  }
+  body.ios-mode .terr-col {
+    grid-column: unset;
+    grid-row: unset;
+    margin-top: 1.4rem;
+  }
+  /* Smaller tooltip for iOS */
+  body.ios-mode #tooltip {
+    width: 160px;
+  }
+  body.ios-mode .photo-box {
+    height: 120px;
+  }
+  body.ios-mode .tt-state { font-size: 11px; }
+  body.ios-mode .tt-plbl  { font-size: 9px; }
+  body.ios-mode .tt-name  { font-size: 11px; margin-bottom: 4px; }
+  body.ios-mode .tt-row   { font-size: 10px; margin-bottom: 2px; }
+  body.ios-mode .tt-body  { padding: 7px 9px; }
+  body.ios-mode .tt-bar   { padding: 6px 9px 5px; }
+  body.ios-mode .tt-badge { font-size: 8px; padding: 1px 5px; }
+
   /* ── Territories section ── */
   .section-divider { border: none; border-top: 2px solid var(--border); margin: 2.5rem 0 2rem; }
   .section-head { font-family: 'Libre Baskerville', serif; font-size: 1.5rem; color: var(--header); border-bottom: 2px solid var(--border); padding-bottom: .5rem; margin-bottom: .4rem; }
@@ -162,6 +213,10 @@
     U.S. Governors Directory
     <div class="hdr-sub">Current Governors of all 50 States &amp; 5 Territories · Data: NGA.org</div>
   </div>
+  <button class="mode-toggle" id="mode-toggle" onclick="toggleMode()">
+    <span class="mode-toggle-icon">🖥️</span>
+    <span id="mode-label">Desktop Mode</span>
+  </button>
 </header>
 
 <div class="page">
@@ -196,6 +251,7 @@
       </div>
     </div>
     <div class="terr-col">
+      <hr class="section-divider">
       <h2 class="section-head">Governors of U.S. Territories</h2>
       <p class="section-sub">Hover over a territory to preview its governor. Click to pin details in the sidebar.</p>
       <div class="terr-map-wrap">
@@ -646,6 +702,22 @@ sel.addEventListener('change', () => {
   pinnedTerr = null;
   d3.selectAll('.terr-shape').classed('active', false);
 });
+
+// ── Mode toggle ──
+let iosMode = false;
+function toggleMode() {
+  iosMode = !iosMode;
+  document.body.classList.toggle('ios-mode', iosMode);
+  const icon = document.querySelector('.mode-toggle-icon');
+  const label = document.getElementById('mode-label');
+  if (iosMode) {
+    icon.textContent = '📱';
+    label.textContent = 'iOS Mode';
+  } else {
+    icon.textContent = '🖥️';
+    label.textContent = 'Desktop Mode';
+  }
+}
 </script>
 </body>
 </html>
